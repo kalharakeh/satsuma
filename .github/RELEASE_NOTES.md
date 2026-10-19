@@ -8,6 +8,7 @@ Satsuma-portable.zip is the same app without an installer. Unzip it and run `Sat
 ### What's in 1.0
 
 - **Shift-drag** any file from Explorer or the desktop, then drop it on a format
+- **Shift-drag selected text** from any app: a copy is pasted where you release the mouse
 - ~100 conversions and tools for images, video, audio, PDF, Office files, data and archives
 - **Remove background** from photos (local AI model, offline after a one-time download)
 - **Subtitles from speech:** turn video or audio into an SRT file and a transcript (Whisper, offline)

@@ -38,6 +38,13 @@ jobs:
       - name: Smoke test (from source, on Windows)
         run: python tests/smoke_test.py --ai
 
+      - name: Text-drag logic + mouse hook start-up
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python tests/test_textdrag.py
+          python -c "import sys; from PySide6.QtWidgets import QApplication; app = QApplication([]); import hook; w = hook.DragWatcher({'text_drag': True, 'shift_drag': True}); err = w.start(); print('hook:', err or 'running'); w.stop(); sys.exit(1 if err else 0)"
+
       - name: Download FFmpeg
         shell: pwsh
         run: |

@@ -18,6 +18,8 @@
 
 **Satsuma** is a file converter that lives where your files already are. Hold **Shift** while dragging any file in Explorer or on the desktop: a panel of formats appears under your cursor. Drop the file on one and the converted copy is saved **next to the original**.
 
+It works for **text** too: select some text in any app, Shift-drag it, and a copy lands wherever you let go.
+
 You don't open an app, upload anything or wait in a queue. Every conversion runs on your own PC, and your original file is never changed.
 
 > Inspired by Tangerine for Mac. Satsuma is an independent, open-source take on the idea for Windows.
@@ -40,6 +42,14 @@ You don't open an app, upload anything or wait in a queue. Every conversion runs
 | **Office** (DOCX, PPTX, XLSX, ODT, RTF) | PDF *(needs Office or LibreOffice)*, CSV | |
 | **Data** | CSV ↔ XLSX / JSON | |
 | **Anything** | ZIP, 7Z | extract (ZIP, 7Z, RAR, TAR, GZ) · **batch rename** |
+
+### Shift-drag text
+
+<img src="docs/text-drag.png" alt="Shift-dragging selected text from an email into a notes window" width="100%">
+
+Select text in any app, hold **Shift** and drag it, then let go somewhere else: in another window, another app, or later in the same document. A copy is typed in where you released. The original text isn't touched, and your clipboard is put back afterwards. Right-click while dragging to cancel.
+
+A plain Shift-click still works as usual, and if nothing is selected, a Shift-drag behaves normally. You can switch this off in the tray menu (*Shift-drag selected text*).
 
 ### The extras
 
@@ -89,6 +99,7 @@ py -3.12 -m venv .venv
 | How | What happens |
 |---|---|
 | **Shift + drag** one or more files | The panel appears at the cursor. Drop on a tile, or on **•••** for every option. |
+| **Shift + drag** selected text | A copy is pasted where you release the mouse. |
 | **Right-click → Convert with Satsuma** | Same panel, click a tile. *(On Windows 11 it's under "Show more options".)* |
 | **Send To → Satsuma** | Works with many selected files at once. |
 | **Tray icon** | Convert files, Undo, Edit presets, Watch folders, settings. |
@@ -132,6 +143,8 @@ Satsuma has no account, no telemetry and no cloud. Files are processed by FFmpeg
 **Does Shift-drag move my file?** No. In Explorer Shift-drag normally means *move*, but Satsuma always accepts the drop as a *copy*, so the original stays where it was.
 
 **The panel doesn't appear when I drag from some app.** By default Satsuma only reacts to drags that start in Explorer, on the desktop or in Open/Save dialogs, so Shift-selecting text elsewhere doesn't pop it up. You can turn that off in the tray menu. Windows also blocks drag-and-drop from apps running as administrator into normal apps; use the right-click entry there.
+
+**Text drag doesn't work in one app.** Windows doesn't let normal apps send input to apps running as administrator, so Satsuma leaves those windows alone. Terminals, the taskbar and the Start menu are skipped on purpose.
 
 **Where are the logs?** In `%APPDATA%\Satsuma\satsuma.log` (tray → *Open log*).
 

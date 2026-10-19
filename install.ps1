@@ -31,7 +31,7 @@ if (Test-Path $vpy) {
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 if ((Resolve-Path $Src).Path -ne (Resolve-Path $Dest).Path) {
     foreach ($f in @("app.py", "engine.py", "features.py", "presets.py", "dialogs.py", "watch.py",
-                     "hook.py", "integrate.py", "version.py", "requirements.txt",
+                     "hook.py", "integrate.py", "textdrag.py", "inject.py", "version.py", "requirements.txt",
                      "README.md", "uninstall.bat", "build_exe.bat", "install.bat", "install.ps1")) {
         Copy-Item -LiteralPath (Join-Path $Src $f) -Destination $Dest -Force
     }

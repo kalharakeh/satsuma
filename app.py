@@ -80,7 +80,7 @@ def log(msg: str):
 
 
 class Settings:
-    DEFAULTS = {"shift_drag": True, "explorer_only": True, "welcomed": False}
+    DEFAULTS = {"shift_drag": True, "explorer_only": True, "text_drag": True, "welcomed": False}
 
     def __init__(self):
         self.path = DATA / "settings.json"
@@ -656,6 +656,9 @@ class Controller(QObject):
         err = self.watcher.start()
         if err:
             log(f"Shift-drag disabled: {err}")
+        elif self.watcher.text is not None:
+            from textdrag import TextDrag
+            self.textdrag = TextDrag(self.watcher.text, log)
         self.watch.start()
         if first_run or not self.settings.get("welcomed"):
             self.settings.set("welcomed", True)
@@ -683,6 +686,8 @@ class Controller(QObject):
                      lambda on: self.settings.set("shift_drag", on))
         self._toggle(m, "Only from Explorer && desktop", self.settings.get("explorer_only"),
                      lambda on: self.settings.set("explorer_only", on))
+        self._toggle(m, "Shift-drag selected text", self.settings.get("text_drag"),
+                     lambda on: self.settings.set("text_drag", on))
         if IS_WIN:
             self._toggle(m, "Right-click menu entry", integrate.context_installed(),
                          lambda on: integrate.install_context() if on else integrate.uninstall_context())

@@ -6,7 +6,7 @@ ROOT = SPECPATH + "/.."
 
 datas = [(ROOT + "/assets", "assets")]
 binaries = []
-hiddenimports = ["engine", "features", "presets", "hook", "integrate", "dialogs", "watch", "version",
+hiddenimports = ["engine", "features", "presets", "hook", "integrate", "dialogs", "watch", "textdrag", "inject", "version",
                  "win32com.client", "pythoncom", "send2trash"]
 hiddenimports += collect_submodules("pynput")
 
