@@ -58,16 +58,6 @@ jobs:
           if ($lic) { Copy-Item $lic.FullName build_bin\FFMPEG-LICENSE.txt }
           "FFmpeg build from https://www.gyan.dev/ffmpeg/builds/ - source: https://ffmpeg.org/download.html" | Set-Content build_bin\FFMPEG-SOURCE.txt
 
-      - name: Build Satsuma.exe
-        run: pyinstaller packaging/satsuma.spec --noconfirm --distpath dist --workpath build
-
-      - name: Add FFmpeg and license files
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory dist\Satsuma\bin -Force | Out-Null
-          Copy-Item build_bin\* dist\Satsuma\bin\
-          Copy-Item LICENSE, README.md dist\Satsuma\
-
       - name: Build the AI pack
         shell: pwsh
         run: |
@@ -81,9 +71,26 @@ jobs:
             $p = Join-Path $env:WINDIR "System32\$dll"
             if (Test-Path $p) { Copy-Item $p build_ai\ }
           }
+          New-Item -ItemType Directory dist -Force | Out-Null
           Compress-Archive -Path build_ai\* -DestinationPath dist\Satsuma-AI-pack.zip
           "READY" | Set-Content build_ai\READY
           "{0:N0} MB AI pack" -f ((Get-Item dist\Satsuma-AI-pack.zip).Length / 1MB)
+          # tell the app which pack it needs (by content) and what the zip's checksum is
+          $id = python -c "import hashlib,sys,numpy; d=open('requirements-ai.txt','rb').read()+f'{sys.version_info[:2]} numpy{numpy.__version__.split(chr(46))[0]}'.encode(); print(hashlib.sha256(d).hexdigest()[:12])"
+          $sha = (Get-FileHash dist\Satsuma-AI-pack.zip -Algorithm SHA256).Hash.ToLower()
+          "AIPACK_ID = `"$id`"" | Add-Content version.py
+          "AIPACK_SHA256 = `"$sha`"" | Add-Content version.py
+          Get-Content version.py
+
+      - name: Build Satsuma.exe
+        run: pyinstaller packaging/satsuma.spec --noconfirm --distpath dist --workpath build
+
+      - name: Add FFmpeg and license files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist\Satsuma\bin -Force | Out-Null
+          Copy-Item build_bin\* dist\Satsuma\bin\
+          Copy-Item LICENSE, README.md dist\Satsuma\
 
       - name: Smoke test (the built .exe, with the AI pack)
         env:

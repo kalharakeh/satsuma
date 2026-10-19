@@ -43,6 +43,8 @@ def download(url: str, dest: Path, progress: Progress, span=(0.0, 0.5)):
                 done += len(chunk)
                 if total:
                     progress(span[0] + (span[1] - span[0]) * done / total)
+        if total and done != total:
+            raise OSError(f"connection dropped after {done // 1048576} MB")
         os.replace(tmp, dest)
     except OSError as e:
         tmp.unlink(missing_ok=True)
@@ -272,7 +274,12 @@ def _u2net(progress: Progress):
             import onnxruntime as ort
         except ImportError:
             raise ConversionError("Background removal needs onnxruntime: pip install onnxruntime")
-        model = download(U2NET_URL, local_dir("models") / "u2net.onnx", progress, (0.3, 0.6))
+        import modelstore
+        legacy = local_dir("models") / "u2net.onnx"  # 1.1.0 kept it here
+        if legacy.exists():
+            (modelstore.models_root() / "u2net").mkdir(exist_ok=True)
+            os.replace(legacy, modelstore.models_root() / "u2net" / "u2net.onnx")
+        model = modelstore.model_file("u2net", progress, (0.3, 0.6))
         opts = ort.SessionOptions()
         opts.log_severity_level = 3
         _session = ort.InferenceSession(str(model), opts, providers=["CPUExecutionProvider"])
@@ -342,10 +349,13 @@ def transcribe(src: Path, progress: Progress, params: dict | None = None):
         raise ConversionError("Subtitles need faster-whisper: pip install faster-whisper")
     exe = ffmpeg_exe()
     total = media_duration(exe, src) or 1.0
-    root = local_dir("models", "whisper")
+    import modelstore
     progress(0.01)
+    first_time = not (modelstore.models_root() / "whisper-small" / "model.bin.ok").exists()
+    base = 0.45 if first_time else 0.05  # the first run spends most of its time downloading the model
+    folder = modelstore.fetch("whisper-small", progress, (0.03, base))
     try:
-        model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", download_root=str(root))
+        model = WhisperModel(str(folder), device="cpu", compute_type="int8")
     except Exception as e:
         raise ConversionError(f"Couldn't load the speech model - first use needs a one-time download ({e}).")
     with tempfile.TemporaryDirectory(prefix="satsuma-stt-") as td:
@@ -357,7 +367,7 @@ def transcribe(src: Path, progress: Progress, params: dict | None = None):
                            creationflags=NOWIN)
         if r.returncode != 0 or not wav.exists():
             raise ConversionError("This file has no audio track.")
-        progress(0.05)
+        progress(base)
         import wave
         import numpy as np
         with wave.open(str(wav), "rb") as w:  # feed samples directly: no PyAV needed
@@ -368,7 +378,7 @@ def transcribe(src: Path, progress: Progress, params: dict | None = None):
             text = seg.text.strip()
             srt.append(f"{n}\n{_srt_time(seg.start)} --> {_srt_time(seg.end)}\n{text}\n")
             plain.append(text)
-            progress(0.05 + 0.94 * min(seg.end / total, 1.0))
+            progress(base + (0.99 - base) * min(seg.end / total, 1.0))
     if not srt:
         raise ConversionError("No speech found.")
     dest = beside(src, ".srt")

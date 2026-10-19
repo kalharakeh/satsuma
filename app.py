@@ -775,11 +775,30 @@ class Controller(QObject):
         self.updater.start()
         self.tray.messageClicked.connect(self._message_clicked)
         self._last_message = None
-        if first_run or not self.settings.get("welcomed"):
-            self.settings.set("welcomed", True)
-            QTimer.singleShot(800, lambda: self.tray.showMessage(
-                "Satsuma is ready", "Hold Shift while dragging a file to convert it. "
-                "Or right-click a file → Convert with Satsuma.", self.icon, 8000))
+        QTimer.singleShot(700, lambda: self._first_things(first_run))
+
+    def _first_things(self, first_run: bool):
+        from welcome import TOUR_VERSION
+        seen = self.settings.get("welcomed")
+        last = self.settings.get("last_version")
+        self.settings.set("last_version", __version__)
+        if first_run or not isinstance(seen, int) or isinstance(seen, bool) or seen < TOUR_VERSION:
+            self.show_welcome()
+        elif last and last != __version__ and __version__[:1].isdigit():
+            self._last_message = "whatsnew"
+            self.tray.showMessage(f"Satsuma updated to {__version__}", "Click to see what's new.", self.icon, 10000)
+
+    def show_welcome(self):
+        from welcome import Welcome
+        w = getattr(self, "_welcome", None)
+        if w is not None and isValid(w) and w.isVisible():
+            w.raise_()
+            return
+        self._welcome = Welcome(self)
+        self._welcome.setAttribute(Qt.WA_DeleteOnClose)
+        self._welcome.show()
+        self._welcome.raise_()
+        self._welcome.activateWindow()
 
     # -- tray
     def _build_tray(self):
@@ -795,6 +814,7 @@ class Controller(QObject):
         m.aboutToShow.connect(lambda: self.undo_action.setEnabled(self.jobs.last_undoable() is not None))
         m.addSeparator()
         m.addAction("Settings…").triggered.connect(self.open_settings)
+        m.addAction("Welcome tour…").triggered.connect(self.show_welcome)
         self.update_action = m.addAction("Update available")
         self.update_action.setVisible(False)
         self.update_action.triggered.connect(self.install_update)
@@ -842,6 +862,9 @@ class Controller(QObject):
     def _message_clicked(self):
         if self._last_message == "update":
             self.install_update()
+        elif self._last_message == "whatsnew":
+            import webbrowser
+            webbrowser.open(f"https://github.com/kalharakeh/satsuma/releases/tag/v{__version__}")
 
     def install_update(self):
         self._last_message = None

@@ -27,6 +27,10 @@ try:
     from version import __version__
 except ImportError:
     __version__ = "dev"
+try:  # written by the release build: a fingerprint of the pack's contents, and the zip's checksum
+    from version import AIPACK_ID, AIPACK_SHA256
+except ImportError:
+    AIPACK_ID, AIPACK_SHA256 = "", ""
 
 
 def pack_dir() -> Path:
@@ -34,7 +38,8 @@ def pack_dir() -> Path:
     if override:
         return Path(override)
     base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".local" / "share")
-    return base / "Satsuma" / f"aipack-{__version__}"
+    # named by content, not app version: an update that doesn't change the AI libraries reuses the pack
+    return base / "Satsuma" / f"aipack-{AIPACK_ID or __version__}"
 
 
 _active = False
@@ -62,11 +67,13 @@ def installed() -> bool:
         return False
 
 
-def _urls() -> list[str]:
+def _urls() -> list[tuple[str, str]]:
+    """(url, expected sha256 or '') - only this release's own pack has a known checksum."""
     urls = []
     if __version__ and __version__[0].isdigit() and "dev" not in __version__:
-        urls.append(f"https://github.com/{REPO}/releases/download/v{__version__}/Satsuma-AI-pack.zip")
-    urls.append(f"https://github.com/{REPO}/releases/latest/download/Satsuma-AI-pack.zip")
+        urls.append((f"https://github.com/{REPO}/releases/download/v{__version__}/Satsuma-AI-pack.zip", AIPACK_SHA256))
+    if not AIPACK_SHA256:  # dev builds only; a release never falls back to an unverified pack
+        urls.append((f"https://github.com/{REPO}/releases/latest/download/Satsuma-AI-pack.zip", ""))
     return urls
 
 
@@ -99,13 +106,20 @@ def ensure(progress: Progress, span=(0.0, 0.5)):
         with tempfile.TemporaryDirectory(prefix="satsuma-aipack-", dir=d.parent) as td:
             z = Path(td) / "pack.zip"
             last = None
-            for url in _urls():
+            for url, digest in _urls() * 2:  # twice: a dropped connection gets one retry
                 try:
                     download(url, z, progress, (span[0], span[0] + (span[1] - span[0]) * 0.85))
-                    break
                 except ConversionError as e:
                     last = e
                     z.unlink(missing_ok=True)
+                    continue
+                if digest:
+                    from modelstore import sha256
+                    if sha256(z) != digest:
+                        z.unlink(missing_ok=True)
+                        last = ConversionError("The AI pack download didn't match its checksum, so it was deleted.")
+                        continue
+                break
             else:
                 raise last or ConversionError("Couldn't download the AI pack.")
             out = Path(td) / "x"
@@ -116,6 +130,9 @@ def ensure(progress: Progress, span=(0.0, 0.5)):
             if d.exists():
                 shutil.rmtree(d, ignore_errors=True)
             os.replace(out, d)
+        for old in d.parent.glob("aipack-*"):  # packs from older versions
+            if old != d and old.is_dir():
+                shutil.rmtree(old, ignore_errors=True)
     finally:
         lock.unlink(missing_ok=True)
     if not installed():

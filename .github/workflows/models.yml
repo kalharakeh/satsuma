@@ -1,0 +1,58 @@
+name: Model mirror
+
+# Copies the AI models Satsuma downloads into this repo's own "models-v1" release, after
+# checking each file against the SHA-256 in modelstore.py. The app tries this mirror first.
+on:
+  push:
+    branches: [main]
+    paths: [modelstore.py, .github/workflows/models.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify
+        run: |
+          mkdir -p mirror
+          python3 - <<'EOF'
+          import ast, hashlib, pathlib, urllib.request
+          src = pathlib.Path("modelstore.py").read_text()
+          tree = ast.parse(src)
+          env = {}
+          for node in tree.body:  # evaluate the constant assignments only (HF, MODELS)
+              if isinstance(node, ast.Assign) and node.targets[0].id in ("HF", "MIRROR", "MODELS"):
+                  exec(compile(ast.Module([node], []), "m", "exec"), env)
+          for name, files in env["MODELS"].items():
+              for fname, size, digest, asset, url in files:
+                  out = pathlib.Path("mirror") / asset
+                  print("fetch", url)
+                  urllib.request.urlretrieve(url, out)
+                  h = hashlib.sha256(out.read_bytes()).hexdigest()
+                  assert out.stat().st_size == size and h == digest, f"{asset}: checksum mismatch"
+                  print("  ok", asset, size)
+          EOF
+          ls -la mirror
+
+      - name: Publish the mirror release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: models-v1
+          name: AI model mirror (not an app release)
+          prerelease: true
+          make_latest: false
+          body: |
+            Mirror of the AI models Satsuma downloads on first use, so they don't depend on third-party hosts.
+            Every file is checked against the SHA-256 in `modelstore.py` before it's uploaded, and again by the app after downloading.
+            **Looking for the app?** Get it from the [latest release](https://github.com/kalharakeh/satsuma/releases/latest).
+
+            | File | Model | License |
+            |---|---|---|
+            | u2net.onnx | U²-Net (via rembg) | Apache-2.0 |
+            | whisper-small-* | faster-whisper small (SYSTRAN, from OpenAI Whisper) | MIT |
+          files: mirror/*
