@@ -36,6 +36,7 @@ import getpass
 import weakref
 import json
 import subprocess
+import threading
 import time
 from datetime import datetime
 
@@ -774,6 +775,10 @@ class Controller(QObject):
         self.updater.progress.connect(self._update_progress)
         self.updater.stage.connect(self._update_stage)
         self.updater.start()
+        test_setup = os.environ.pop("SATSUMA_UPDATE_TEST", None)  # CI: run the real update hand-off
+        if test_setup:
+            log("update: test run")
+            QTimer.singleShot(8000, lambda: self.updater.run_installer(Path(test_setup), __version__))
         self.tray.messageClicked.connect(self._message_clicked)
         self._last_message = None
         QTimer.singleShot(700, lambda: self._first_things(first_run))
@@ -1019,7 +1024,15 @@ class Controller(QObject):
             subprocess.Popen(["xdg-open", str(LOG)])
 
     def quit(self):
-        self.watcher.stop()
+        # never linger: an update waits for us to close, and a stuck hook thread must not block that
+        t = threading.Timer(5.0, lambda: os._exit(0))
+        t.daemon = True
+        t.start()
+        log("quitting")
+        try:
+            self.watcher.stop()
+        except Exception as e:
+            log(f"hook stop failed: {e}")
         self.tray.hide()
         self.app.quit()
 

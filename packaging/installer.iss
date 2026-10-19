@@ -55,7 +55,9 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Code, I: Integer;
 begin
-  { ask a running copy to quit, wait for it (up to 15 s), then make sure nothing is left that locks files }
+  { Ask a running copy to quit and wait for it (up to 15 s). Then force-close any Satsuma.exe that is
+    left (including running conversions) so no file is locked. Only Satsuma.exe itself is closed, never
+    its process tree: during an update this installer was started by Satsuma, and /T would kill it too. }
   if FileExists(ExpandConstant('{app}\Satsuma.exe')) then
     Exec(ExpandConstant('{app}\Satsuma.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, Code);
   for I := 1 to 30 do
@@ -65,7 +67,9 @@ begin
     Sleep(500);
   end;
   Sleep(1000);
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM Satsuma.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Log('PrepareToInstall: Satsuma closed (taskkill exit code ' + IntToStr(Code) + ')');
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Satsuma.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Log('PrepareToInstall: taskkill exit code ' + IntToStr(Code) + ' (128 = nothing was running)');
+  if Code = 0 then
+    Sleep(1500);  { let Windows release the files of the closed processes }
   Result := '';
 end;

@@ -5,6 +5,10 @@
 
 > Windows SmartScreen may warn because the app isn't code-signed yet: click **More info → Run anyway**.
 
+### Fixed in 1.1.3
+
+- **Updating from inside Satsuma works again.** In 1.1.2 the installer could close itself along with the old Satsuma, so the app quit and the old version stayed. The installer now only closes Satsuma, and Satsuma always finishes closing within a few seconds. Every build now tests a real in-app update on Windows before it can be released.
+
 ### New in 1.1.2
 
 - **Updates you can see:** a progress card shows the download and install. Satsuma then confirms "✓ Updated to 1.x", or tells you clearly if an update didn't finish.

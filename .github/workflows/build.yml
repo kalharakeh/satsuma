@@ -107,6 +107,34 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VERSION /DNumVersion=$env:NUMVERSION packaging\installer.iss
           Compress-Archive -Path dist\Satsuma\* -DestinationPath dist\Satsuma-portable.zip
 
+      - name: Update test (installed Satsuma starts the installer, closes, and comes back)
+        shell: pwsh
+        run: |
+          $log = "$env:APPDATA\Satsuma\satsuma.log"
+          $setupLog = "$env:TEMP\Satsuma-update.log"
+          Remove-Item $log, $setupLog -ErrorAction SilentlyContinue
+          $copy = "$env:RUNNER_TEMP\Satsuma-Setup-test.exe"
+          Copy-Item dist\Satsuma-Setup.exe $copy
+          # the installed app picks this up and runs the same hand-off as a real update
+          $env:SATSUMA_UPDATE_TEST = $copy
+          $p = Start-Process dist\Satsuma-Setup.exe -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$env:RUNNER_TEMP\first-install.log"
+          $p.WaitForExit()
+          Remove-Item Env:\SATSUMA_UPDATE_TEST
+          $deadline = (Get-Date).AddSeconds(240)
+          $starts = 0
+          do {
+            Start-Sleep -Seconds 3
+            $starts = @(Select-String -Path $log -Pattern '\(--install\)' -ErrorAction SilentlyContinue).Count
+          } until ($starts -ge 2 -or (Get-Date) -gt $deadline)
+          Start-Sleep -Seconds 3
+          "---- satsuma.log"; Get-Content $log -ErrorAction SilentlyContinue
+          "---- installer log (tail)"; Get-Content $setupLog -Tail 40 -ErrorAction SilentlyContinue
+          $ok = Select-String -Path $setupLog -Pattern 'Installation process succeeded' -Quiet -ErrorAction SilentlyContinue
+          Get-Process Satsuma -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $ok) { throw "The update installer did not finish" }
+          if ($starts -lt 2) { throw "Satsuma did not start again after the update" }
+          "Update hand-off works: installer finished and Satsuma restarted"
+
       - uses: actions/upload-artifact@v4
         with:
           name: Satsuma-${{ env.VERSION }}

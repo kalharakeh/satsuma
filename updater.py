@@ -78,6 +78,24 @@ class Updater(QObject):
                     self.failed.emit(f"Couldn't check for updates ({e.__class__.__name__}).")
         threading.Thread(target=work, daemon=True).start()
 
+    def run_installer(self, setup: Path, version: str):
+        """Start the installer on its own, so it survives Satsuma quitting (and being force-closed)."""
+        setup_log = Path(tempfile.gettempdir()) / "Satsuma-update.log"
+        self.settings.set("updating_to", version)
+        self.log(f"update: starting installer {setup} (its log: {setup_log})")
+        args = [str(setup), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/LOG={setup_log}"]
+        if os.name == "nt":
+            # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP, and out of any job object Satsuma runs in
+            flags = 0x00000008 | 0x00000200
+            try:
+                subprocess.Popen(args, creationflags=flags | 0x01000000, close_fds=True)  # CREATE_BREAKAWAY_FROM_JOB
+            except OSError:
+                subprocess.Popen(args, creationflags=flags, close_fds=True)
+        else:
+            subprocess.Popen(args)
+        self.progress.emit(100)
+        self.stage.emit("installing")
+
     stage = Signal(str)  # "installing" once the installer has been started
 
     def install(self):
@@ -118,14 +136,7 @@ class Updater(QObject):
                     if h.hexdigest() != digest:
                         dest.unlink(missing_ok=True)
                         raise OSError("checksum mismatch")
-                setup_log = Path(tempfile.gettempdir()) / "Satsuma-update.log"
-                self.settings.set("updating_to", version)
-                self.log(f"update: download ok, starting installer (its log: {setup_log})")
-                # /SILENT shows only a progress window; the installer closes us and starts the new version
-                subprocess.Popen([str(dest), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/LOG={setup_log}"],
-                                 creationflags=0x00000008 if os.name == "nt" else 0)  # DETACHED_PROCESS
-                self.progress.emit(100)
-                self.stage.emit("installing")
+                self.run_installer(dest, version)
             except Exception as e:
                 self.log(f"update: failed - {e}")
                 self.failed.emit(f"Update download failed ({e}). You can get it from GitHub instead.")
