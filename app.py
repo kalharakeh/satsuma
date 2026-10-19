@@ -770,8 +770,9 @@ class Controller(QObject):
         import updater
         self.updater = updater.Updater(self.settings, __version__, log)
         self.updater.available.connect(self._update_available)
-        self.updater.failed.connect(lambda msg: self.tray.showMessage("Satsuma", msg, self.icon, 5000))
+        self.updater.failed.connect(self._update_failed)
         self.updater.progress.connect(self._update_progress)
+        self.updater.stage.connect(self._update_stage)
         self.updater.start()
         self.tray.messageClicked.connect(self._message_clicked)
         self._last_message = None
@@ -782,6 +783,20 @@ class Controller(QObject):
         seen = self.settings.get("welcomed")
         last = self.settings.get("last_version")
         self.settings.set("last_version", __version__)
+        target = self.settings.get("updating_to")
+        if target:  # we were restarted by an update (or it didn't complete)
+            self.settings.set("updating_to", None)
+            if target == __version__:
+                log(f"update: now running {__version__} (was {last})")
+                self._last_message = "whatsnew"
+                self.tray.showMessage(f"\u2713 Satsuma updated to {__version__}", "Click to see what's new.",
+                                      self.icon, 10000)
+                return
+            log(f"update: expected {target} but still running {__version__} - see %TEMP%\\Satsuma-update.log")
+            self._last_message = "update-failed"
+            self.tray.showMessage("The update didn't finish", f"Still on {__version__}. Click to download "
+                                  f"{target} from GitHub and install it by hand.", self.icon, 15000)
+            return
         if first_run or not isinstance(seen, int) or isinstance(seen, bool) or seen < TOUR_VERSION:
             self.show_welcome()
         elif last and last != __version__ and __version__[:1].isdigit():
@@ -869,19 +884,68 @@ class Controller(QObject):
     def _message_clicked(self):
         if self._last_message == "update":
             self.install_update()
+        elif self._last_message == "update-failed":
+            import webbrowser
+            webbrowser.open("https://github.com/kalharakeh/satsuma/releases/latest")
         elif self._last_message == "whatsnew":
             import webbrowser
             webbrowser.open(f"https://github.com/kalharakeh/satsuma/releases/tag/v{__version__}")
 
     def install_update(self):
         self._last_message = None
-        self.tray.showMessage("Updating Satsuma", "Downloading the new version…", self.icon, 4000)
+        log(f"update: user started update from {__version__}")
+        self._update_card()
         self.updater.install()
 
+    def _update_card(self):
+        """A card in the progress corner, so the update is visible from start to finish."""
+        card_ = getattr(self, "_ucard", None)
+        if card_ is not None and isValid(card_):
+            return card_
+        card_ = QFrame(objectName="job")
+        v = QVBoxLayout(card_)
+        v.setContentsMargins(10, 8, 10, 8)
+        v.setSpacing(5)
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Satsuma update"), 1)
+        new = ((self.updater.latest or {}).get("tag_name") or "").lstrip("v") or "new version"
+        lab = QLabel(f"\u2192 {new}", objectName="jobAction")
+        top.addWidget(lab)
+        v.addLayout(top)
+        bar = QProgressBar(textVisible=False)
+        bar.setFixedHeight(4)
+        bar.setRange(0, 100)
+        v.addWidget(bar)
+        status = QLabel("Downloading\u2026", objectName="status", wordWrap=True)
+        v.addWidget(status)
+        card_.bar, card_.status = bar, status
+        self.jobs.v.addWidget(card_)
+        self.jobs.hide_timer.stop()
+        self.jobs.show()
+        self.jobs._place()
+        self._ucard = card_
+        return card_
+
     def _update_progress(self, pct: int):
-        self.update_action.setText(f"Downloading update… {pct}%")
-        if pct >= 100:
-            QTimer.singleShot(1500, self.quit)  # the installer takes over and restarts Satsuma
+        self.update_action.setText(f"Downloading update\u2026 {pct}%")
+        c = self._update_card()
+        c.bar.setValue(pct)
+        c.status.setText(f"Downloading\u2026 {pct}%" if pct < 100 else
+                         "Installing - Satsuma will close and reopen in a moment.")
+
+    def _update_stage(self, stage: str):
+        if stage == "installing":
+            QTimer.singleShot(2500, self.quit)  # the installer takes over and restarts Satsuma
+
+    def _update_failed(self, msg: str):
+        c = getattr(self, "_ucard", None)
+        if c is not None and isValid(c):
+            c.bar.hide()
+            c.status.setText(msg)
+            c.status.setProperty("state", "error")
+            c.status.style().unpolish(c.status)
+            c.status.style().polish(c.status)
+        self.tray.showMessage("Satsuma", msg, self.icon, 6000)
 
     # -- text drag panel
     def _text_panel(self):
@@ -1086,6 +1150,7 @@ class Controller(QObject):
 # ------------------------------------------------------------ single instance
 
 _mutex = None
+_run_mutex = None
 
 
 def acquire_primary() -> bool:
@@ -1095,7 +1160,11 @@ def acquire_primary() -> bool:
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
         k32.CreateMutexW.restype = ctypes.c_void_p
         _mutex = k32.CreateMutexW(None, False, f"Local\\{SERVER}")
-        return ctypes.get_last_error() != 183  # ERROR_ALREADY_EXISTS
+        primary = ctypes.get_last_error() != 183  # ERROR_ALREADY_EXISTS
+        if primary:  # a fixed name the installer can wait on while updating
+            global _run_mutex
+            _run_mutex = k32.CreateMutexW(None, False, "SatsumaAppRunning")
+        return primary
     probe = QLocalSocket()
     probe.connectToServer(SERVER)
     alive = probe.waitForConnected(200)
@@ -1167,7 +1236,7 @@ def main() -> int:
     ctrl = Controller(app, first_run=mode == "--install")
     if files:
         ctrl.queue_open(files)
-    log(f"started ({mode})")
+    log(f"started {__version__} ({mode})")
     code = app.exec()
     ctrl.watcher.stop()
     sys.stdout and sys.stdout.flush()

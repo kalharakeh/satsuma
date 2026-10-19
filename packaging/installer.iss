@@ -53,13 +53,19 @@ Filename: "{app}\Satsuma.exe"; Parameters: "--uninstall"; Flags: waituntiltermin
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  Code: Integer;
+  Code, I: Integer;
 begin
-  { close a running copy so its files can be replaced }
+  { ask a running copy to quit, wait for it (up to 15 s), then make sure nothing is left that locks files }
   if FileExists(ExpandConstant('{app}\Satsuma.exe')) then
-  begin
     Exec(ExpandConstant('{app}\Satsuma.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, Code);
-    Sleep(1000);
+  for I := 1 to 30 do
+  begin
+    if not CheckForMutexes('SatsumaAppRunning') then
+      Break;
+    Sleep(500);
   end;
+  Sleep(1000);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM Satsuma.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Log('PrepareToInstall: Satsuma closed (taskkill exit code ' + IntToStr(Code) + ')');
   Result := '';
 end;

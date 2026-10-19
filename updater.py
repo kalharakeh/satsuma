@@ -78,19 +78,25 @@ class Updater(QObject):
                     self.failed.emit(f"Couldn't check for updates ({e.__class__.__name__}).")
         threading.Thread(target=work, daemon=True).start()
 
+    stage = Signal(str)  # "installing" once the installer has been started
+
     def install(self):
         """Download the new installer and run it. Satsuma quits; the installer restarts it."""
         if not FROZEN or not self.latest:
+            self.log("update: not an installed copy - opening the releases page")
             webbrowser.open(RELEASES)
             return
         asset = next((a for a in self.latest.get("assets", []) if a.get("name") == "Satsuma-Setup.exe"), None)
         if not asset:
+            self.log("update: release has no installer yet - opening the releases page")
             webbrowser.open(RELEASES)
             return
+        version = self.latest["tag_name"].lstrip("v")
 
         def work():
             try:
                 dest = Path(tempfile.gettempdir()) / f"Satsuma-Setup-{self.latest['tag_name']}.exe"
+                self.log(f"update: downloading {version} ({asset.get('size', 0) // 1048576} MB) to {dest}")
                 req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": "Satsuma"})
                 with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:
                     total = int(r.headers.get("Content-Length") or asset.get("size") or 0)
@@ -102,10 +108,25 @@ class Updater(QObject):
                             self.progress.emit(int(done * 100 / total))
                 if asset.get("size") and dest.stat().st_size != asset["size"]:
                     raise OSError("download incomplete")
-                # /SILENT shows only a progress bar; the installer closes us and starts the new version
-                subprocess.Popen([str(dest), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
+                digest = (asset.get("digest") or "").removeprefix("sha256:")
+                if digest:
+                    import hashlib
+                    h = hashlib.sha256()
+                    with open(dest, "rb") as f:
+                        while chunk := f.read(1 << 20):
+                            h.update(chunk)
+                    if h.hexdigest() != digest:
+                        dest.unlink(missing_ok=True)
+                        raise OSError("checksum mismatch")
+                setup_log = Path(tempfile.gettempdir()) / "Satsuma-update.log"
+                self.settings.set("updating_to", version)
+                self.log(f"update: download ok, starting installer (its log: {setup_log})")
+                # /SILENT shows only a progress window; the installer closes us and starts the new version
+                subprocess.Popen([str(dest), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/LOG={setup_log}"],
                                  creationflags=0x00000008 if os.name == "nt" else 0)  # DETACHED_PROCESS
                 self.progress.emit(100)
+                self.stage.emit("installing")
             except Exception as e:
+                self.log(f"update: failed - {e}")
                 self.failed.emit(f"Update download failed ({e}). You can get it from GitHub instead.")
         threading.Thread(target=work, daemon=True).start()
