@@ -10,7 +10,7 @@ hiddenimports = ["engine", "features", "presets", "hook", "integrate", "dialogs"
                  "win32com.client", "pythoncom", "send2trash"]
 hiddenimports += collect_submodules("pynput")
 
-for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "rapidocr_onnxruntime", "pdf2docx",
+for pkg in ("pymupdf", "fitz", "faster_whisper", "ctranslate2", "onnxruntime", "rapidocr_onnxruntime", "pdf2docx",
             "pillow_heif", "py7zr", "winrt", "tokenizers"):
     try:
         d, b, h = collect_all(pkg)
