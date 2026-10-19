@@ -124,12 +124,15 @@ jobs:
           $starts = 0
           do {
             Start-Sleep -Seconds 3
-            $starts = @(Select-String -Path $log -Pattern '\(--install\)' -ErrorAction SilentlyContinue).Count
+            if (Test-Path $log) { $starts = @(Select-String -Path $log -Pattern '\(--install\)').Count }
           } until ($starts -ge 2 -or (Get-Date) -gt $deadline)
           Start-Sleep -Seconds 3
-          "---- satsuma.log"; Get-Content $log -ErrorAction SilentlyContinue
-          "---- installer log (tail)"; Get-Content $setupLog -Tail 40 -ErrorAction SilentlyContinue
-          $ok = Select-String -Path $setupLog -Pattern 'Installation process succeeded' -Quiet -ErrorAction SilentlyContinue
+          $ok = $false
+          if (Test-Path $log) { "---- satsuma.log"; Get-Content $log }
+          if (Test-Path $setupLog) {
+            "---- installer log (tail)"; Get-Content $setupLog -Tail 40
+            $ok = Select-String -Path $setupLog -Pattern 'Installation process succeeded' -Quiet
+          }
           Get-Process Satsuma -ErrorAction SilentlyContinue | Stop-Process -Force
           if (-not $ok) { throw "The update installer did not finish" }
           if ($starts -lt 2) { throw "Satsuma did not start again after the update" }
