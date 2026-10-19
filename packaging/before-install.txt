@@ -1,0 +1,19 @@
+Satsuma - offline file converter
+
+PRIVACY
+Satsuma runs entirely on this PC. It never uploads your files and has no account, analytics or telemetry.
+
+It only uses the network for:
+- a daily update check (GitHub) - can be switched off in Settings
+- one-time downloads of AI tools, the first time you use one (GitHub; Hugging Face as fallback)
+- Translate, which opens your browser with the text you chose
+- Send to phone, which works inside your own Wi-Fi only while its window is open
+
+Full policy: https://github.com/kalharakeh/satsuma/blob/main/PRIVACY.md
+
+WHAT THE INSTALLER CHANGES
+- Adds "Convert with Satsuma" to the right-click menu and a Send To shortcut
+- Adds a Start menu shortcut and starts Satsuma with Windows
+- Installs for your user only (no admin rights) into %LOCALAPPDATA%\Programs\Satsuma
+
+Everything can be switched off in Settings, and Apps > Satsuma > Uninstall removes it all.

@@ -788,6 +788,12 @@ class Controller(QObject):
             self._last_message = "whatsnew"
             self.tray.showMessage(f"Satsuma updated to {__version__}", "Click to see what's new.", self.icon, 10000)
 
+    def report_problem(self):
+        import diagnostics
+        diagnostics.report_problem(self.settings, LOG, __version__)
+        self.tray.showMessage("Report a problem", "Diagnostic info is on your clipboard - paste it into the "
+                              "GitHub issue that just opened.", self.icon, 8000)
+
     def show_welcome(self):
         from welcome import Welcome
         w = getattr(self, "_welcome", None)
@@ -815,6 +821,7 @@ class Controller(QObject):
         m.addSeparator()
         m.addAction("Settings…").triggered.connect(self.open_settings)
         m.addAction("Welcome tour…").triggered.connect(self.show_welcome)
+        m.addAction("Report a problem…").triggered.connect(self.report_problem)
         self.update_action = m.addAction("Update available")
         self.update_action.setVisible(False)
         self.update_action.triggered.connect(self.install_update)

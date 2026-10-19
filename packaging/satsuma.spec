@@ -8,7 +8,7 @@ ROOT = SPECPATH + "/.."
 datas = [(ROOT + "/assets", "assets"), (ROOT + "/models", "models")]
 binaries = []
 hiddenimports = ["engine", "features", "tools2", "presets", "aipack", "hook", "integrate", "dialogs", "editors",
-                 "phone", "updater", "settingswin", "watch", "textdrag", "inject", "version", "modelstore", "welcome",
+                 "phone", "updater", "settingswin", "watch", "textdrag", "inject", "version", "modelstore", "welcome", "diagnostics",
                  "win32com.client", "pythoncom", "send2trash", "qrcode", "qrcode.image.pil", "cv2"]
 hiddenimports += collect_submodules("pynput")
 
@@ -34,6 +34,8 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure)
+import os
+VERSION_FILE = os.path.join(SPECPATH, "file_version_info.txt")  # written by packaging/version_info.py
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="Satsuma", console=False,
-          icon=ROOT + "/assets/icon.ico", version=None, upx=False)
+          icon=ROOT + "/assets/icon.ico", version=VERSION_FILE if os.path.exists(VERSION_FILE) else None, upx=False)
 coll = COLLECT(exe, a.binaries, a.datas, name="Satsuma", upx=False)

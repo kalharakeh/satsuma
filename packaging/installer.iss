@@ -4,6 +4,9 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
+#ifndef NumVersion
+  #define NumVersion "0.0.0"
+#endif
 
 [Setup]
 AppId={{6A4F2C1E-8B1D-4E5A-9C3F-5A7E0D2B9F41}
@@ -27,6 +30,11 @@ UninstallDisplayName=Satsuma
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+InfoBeforeFile=before-install.txt
+LicenseFile=..\LICENSE
+VersionInfoVersion={#NumVersion}
+VersionInfoProductName=Satsuma
+VersionInfoDescription=Satsuma installer
 CloseApplications=no
 
 [Files]

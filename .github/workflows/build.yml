@@ -30,6 +30,7 @@ jobs:
           else { $v = ((Get-Content version.py) -replace '.*"(.*)".*', '$1') + "-dev" }
           "__version__ = `"$v`"" | Set-Content version.py
           "VERSION=$v" >> $env:GITHUB_ENV
+          "NUMVERSION=$($v.Split('-')[0])" >> $env:GITHUB_ENV
 
       - name: Install dependencies
         run: |
@@ -83,7 +84,9 @@ jobs:
           Get-Content version.py
 
       - name: Build Satsuma.exe
-        run: pyinstaller packaging/satsuma.spec --noconfirm --distpath dist --workpath build
+        run: |
+          python packaging/version_info.py
+          pyinstaller packaging/satsuma.spec --noconfirm --distpath dist --workpath build
 
       - name: Add FFmpeg and license files
         shell: pwsh
@@ -101,7 +104,7 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VERSION packaging\installer.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VERSION /DNumVersion=$env:NUMVERSION packaging\installer.iss
           Compress-Archive -Path dist\Satsuma\* -DestinationPath dist\Satsuma-portable.zip
 
       - uses: actions/upload-artifact@v4
@@ -122,3 +125,15 @@ jobs:
             dist/Satsuma-Setup.exe
             dist/Satsuma-portable.zip
             dist/Satsuma-AI-pack.zip
+
+      - name: Submit the new version to winget
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if (-not $env:WINGET_TOKEN) { "No WINGET_TOKEN secret - skipping winget (see packaging/winget/README.md)"; exit 0 }
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe update KassemAlharakeh.Satsuma --version $env:VERSION `
+            --urls "https://github.com/kalharakeh/satsuma/releases/download/v$($env:VERSION)/Satsuma-Setup.exe" `
+            --submit --token $env:WINGET_TOKEN

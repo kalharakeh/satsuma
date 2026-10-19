@@ -312,6 +312,10 @@ class SettingsWindow(QDialog):
         self.update_label = QLabel("", objectName="help")
         v.addWidget(self.update_label)
         row = QHBoxLayout()
+        diag = QPushButton("Copy diagnostic info")
+        diag.setAutoDefault(False)
+        diag.clicked.connect(self._diag)
+        row.addWidget(diag)
         b = QPushButton("Check for updates")
         b.setAutoDefault(False)
         b.clicked.connect(self._check)
@@ -320,6 +324,12 @@ class SettingsWindow(QDialog):
         v.addLayout(row)
         v.addStretch(1)
         return w
+
+    def _diag(self):
+        import diagnostics
+        from app import LOG, __version__
+        diagnostics.copy_report(self.settings, LOG, __version__)
+        self.update_label.setText("Copied. Paste it into a GitHub issue or an email - nothing was sent anywhere.")
 
     def _check(self):
         self.update_label.setText("Checking…")

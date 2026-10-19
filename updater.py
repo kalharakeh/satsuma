@@ -64,7 +64,10 @@ class Updater(QObject):
                     data = json.load(r)
                 tag = data.get("tag_name", "")
                 self.settings.set("update_last_check", int(time.time()))
-                if is_newer(tag, self.current) and (manual or tag != self.settings.get("update_skipped")):
+                # a release is announced only once its installer has been built and attached
+                ready = any(a.get("name") == "Satsuma-Setup.exe" and a.get("state", "uploaded") == "uploaded"
+                            for a in data.get("assets", []))
+                if is_newer(tag, self.current) and ready and (manual or tag != self.settings.get("update_skipped")):
                     self.latest = data
                     self.available.emit(tag.lstrip("v"), (data.get("body") or "")[:600])
                 elif manual:

@@ -139,7 +139,7 @@ Output names never overwrite anything: `photo.jpg`, `photo-10MB.jpg`, `photo (1)
 
 ## Privacy
 
-Satsuma has no account, no telemetry and no cloud. Files are processed on your own machine. The only network requests are:
+Satsuma has no account, no telemetry and no cloud ([full privacy policy](PRIVACY.md)). Files are processed on your own machine. The only network requests are:
 
 - the daily update check (GitHub)
 - one-time downloads of the AI pack and models (GitHub, Hugging Face), only when you first use an AI tool

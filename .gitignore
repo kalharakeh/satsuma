@@ -9,3 +9,4 @@ ff.zip
 *.spec.bak
 .DS_Store
 Thumbs.db
+packaging/file_version_info.txt
