@@ -91,7 +91,7 @@ def main() -> int:
     if a.ai:
         cases.append(("img-cutout", ["sample.png"], None))
     failed = 0
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         d = Path(td)
         make_samples(d)
         for action, files, params in cases:
