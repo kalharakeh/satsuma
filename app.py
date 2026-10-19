@@ -23,8 +23,17 @@ if str(HERE) not in sys.path:
 if __name__ == "__main__" and sys.argv[1:2] == ["--run"]:
     import engine
     sys.exit(engine.run_cli(sys.argv[2], sys.argv[3:]))
+if __name__ == "__main__" and sys.argv[1:2] == ["--faces"]:  # OpenCV stays out of the UI process
+    import json as _json
+    import engine  # noqa: F401
+    import tools2
+    out = sys.stdout if sys.stdout is not None else engine._std_handle_writer()
+    out.write(_json.dumps(tools2.detect_faces(engine.Path(sys.argv[2]))) + "\n")
+    out.flush()
+    sys.exit(0)
 
 import getpass
+import weakref
 import json
 import subprocess
 import time
@@ -115,6 +124,8 @@ def reveal(path: str | Path):
 
 
 def summary(files: list[Path]) -> str:
+    if not files:
+        return "AI pack"
     if len(files) == 1:
         return files[0].name
     kinds = {engine.kind_of(f) for f in files}
@@ -194,7 +205,8 @@ def set_elided(label: QLabel, text: str, width: int):
 class Tile(QFrame):
     def __init__(self, panel: "Panel", action, title: str, hint: str):
         super().__init__(objectName="tile")
-        self.panel, self.action = panel, action
+        self._panel = weakref.ref(panel)  # no reference cycle: Qt and Python must not both free the panel
+        self.action = action
         self.setFixedSize(TILE_W, TILE_H)
         self.setProperty("hot", False)
         lay = QVBoxLayout(self)
@@ -208,6 +220,10 @@ class Tile(QFrame):
         self.setToolTip(action.label if action else "Every option for these files")
         self.setCursor(Qt.PointingHandCursor)
 
+    @property
+    def panel(self) -> "Panel":
+        return self._panel()
+
     def set_hot(self, on: bool):
         if self.property("hot") == on:
             return
@@ -217,15 +233,17 @@ class Tile(QFrame):
             w.style().polish(w)
 
     def enterEvent(self, e):
-        if not self.panel.drag_mode:
-            self.panel.set_hot(self)
+        p = self.panel
+        if p is not None and not p.drag_mode:
+            p.set_hot(self)
 
     def leaveEvent(self, e):
-        if not self.panel.drag_mode:
-            self.panel.set_hot(None)
+        p = self.panel
+        if p is not None and not p.drag_mode:
+            p.set_hot(None)
 
     def mouseReleaseEvent(self, e):
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.LeftButton and self.panel is not None:
             self.panel.activate(self)
 
 
@@ -625,6 +643,94 @@ class JobsWindow(QWidget):
         self.move(g.right() - self.width() + 8, g.bottom() - self.height() + 8)
 
 
+# ----------------------------------------------------------------- text panel
+
+TEXT_TOOLS = [("upper", "UPPER", "in place"), ("lower", "lower", "in place"), ("title", "Title", "Case Words"),
+              ("clean", "Clean", "fix spacing"), ("translate", "Translate", "in browser"), ("qr", "QR", "code"),
+              ("save", "Save", ".txt file"), ("count", "Count", "words")]
+
+
+class TextTile(QFrame):
+    def __init__(self, key: str, title: str, hint: str):
+        super().__init__(objectName="tile")
+        self.key = key
+        self.setFixedSize(TILE_W, TILE_H)
+        self.setProperty("hot", False)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(3, 6, 3, 6)
+        lay.setSpacing(0)
+        for text, name in ((title, "tileTitle"), (hint, "tileHint")):
+            lab = QLabel(text, objectName=name, alignment=Qt.AlignCenter)
+            lab.setAttribute(Qt.WA_TransparentForMouseEvents)
+            lay.addWidget(lab)
+
+    def set_hot(self, on: bool):
+        if self.property("hot") != on:
+            self.setProperty("hot", on)
+            for w in (self, *self.findChildren(QLabel)):
+                w.style().unpolish(w)
+                w.style().polish(w)
+
+
+class TextPanel(QWidget):
+    """Shown while Shift-dragging text. Drop on a tile to transform the text; drop anywhere else to paste it."""
+
+    def __init__(self):
+        super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.card, v = card(self)
+        self.card.setFixedWidth(COLS * TILE_W + (COLS - 1) * GAP + 24)
+        h, sub = header(APP_NAME)
+        sub.setText("drop on a tool, or anywhere to paste")
+        v.addLayout(h)
+        grid = QGridLayout()
+        grid.setSpacing(GAP)
+        self.tiles = [TextTile(*t) for t in TEXT_TOOLS]
+        for n, t in enumerate(self.tiles):
+            grid.addWidget(t, n // COLS, n % COLS)
+        v.addLayout(grid)
+        self.timer = QTimer(self, interval=30, timeout=self._hover)
+        self.hot = None
+
+    def show_near(self, pos: QPoint):
+        self.adjustSize()
+        scr = QGuiApplication.screenAt(pos) or QGuiApplication.primaryScreen()
+        g = scr.availableGeometry()
+        x = pos.x() + 30
+        y = pos.y() - self.height() - 10  # above the text, so it doesn't cover where you're heading
+        if y < g.top():
+            y = pos.y() + 30
+        x = min(max(x, g.left()), g.right() - self.width())
+        self.move(x, y)
+        self.show()
+        self.timer.start()
+
+    def tile_at(self, gpos: QPoint) -> "TextTile | None":
+        for t in self.tiles:
+            if t.rect().contains(t.mapFromGlobal(gpos)):
+                return t
+        return None
+
+    def _hover(self):
+        t = self.tile_at(QCursor.pos())
+        if t is not self.hot:
+            if self.hot:
+                self.hot.set_hot(False)
+            self.hot = t
+            if t:
+                t.set_hot(True)
+
+    def hit(self, gpos: QPoint) -> str | None:
+        t = self.tile_at(gpos)
+        return t.key if t else None
+
+    def closeEvent(self, e):
+        self.timer.stop()
+        super().closeEvent(e)
+
+
 # ----------------------------------------------------------------- controller
 
 class Controller(QObject):
@@ -658,8 +764,17 @@ class Controller(QObject):
             log(f"Shift-drag disabled: {err}")
         elif self.watcher.text is not None:
             from textdrag import TextDrag
-            self.textdrag = TextDrag(self.watcher.text, log)
+            self.textdrag = TextDrag(self.watcher.text, log, panel_factory=self._text_panel,
+                                     on_action=self.text_action)
         self.watch.start()
+        import updater
+        self.updater = updater.Updater(self.settings, __version__, log)
+        self.updater.available.connect(self._update_available)
+        self.updater.failed.connect(lambda msg: self.tray.showMessage("Satsuma", msg, self.icon, 5000))
+        self.updater.progress.connect(self._update_progress)
+        self.updater.start()
+        self.tray.messageClicked.connect(self._message_clicked)
+        self._last_message = None
         if first_run or not self.settings.get("welcomed"):
             self.settings.set("welcomed", True)
             QTimer.singleShot(800, lambda: self.tray.showMessage(
@@ -679,19 +794,10 @@ class Controller(QObject):
         self.undo_action.triggered.connect(self.undo_last)
         m.aboutToShow.connect(lambda: self.undo_action.setEnabled(self.jobs.last_undoable() is not None))
         m.addSeparator()
-        m.addAction("Edit presets…").triggered.connect(self.edit_presets)
-        m.addAction("Watch folders…").triggered.connect(self.edit_watch)
-        m.addSeparator()
-        self._toggle(m, "Shift-drag to convert", self.settings.get("shift_drag"),
-                     lambda on: self.settings.set("shift_drag", on))
-        self._toggle(m, "Only from Explorer && desktop", self.settings.get("explorer_only"),
-                     lambda on: self.settings.set("explorer_only", on))
-        self._toggle(m, "Shift-drag selected text", self.settings.get("text_drag"),
-                     lambda on: self.settings.set("text_drag", on))
-        if IS_WIN:
-            self._toggle(m, "Right-click menu entry", integrate.context_installed(),
-                         lambda on: integrate.install_context() if on else integrate.uninstall_context())
-            self._toggle(m, "Start with Windows", integrate.startup_enabled(), integrate.set_startup)
+        m.addAction("Settings…").triggered.connect(self.open_settings)
+        self.update_action = m.addAction("Update available")
+        self.update_action.setVisible(False)
+        self.update_action.triggered.connect(self.install_update)
         m.addSeparator()
         m.addAction("Open log").triggered.connect(self._open_log)
         m.addAction("Quit").triggered.connect(self.quit)
@@ -714,6 +820,71 @@ class Controller(QObject):
                 log(f"{text}: {e}")
         a.toggled.connect(changed)
         return a
+
+    # -- settings, updates
+    def open_settings(self):
+        from settingswin import SettingsWindow
+        if getattr(self, "_settings_win", None) and isValid(self._settings_win):
+            self._settings_win.raise_()
+            self._settings_win.activateWindow()
+            return
+        self._settings_win = SettingsWindow(self)
+        self._settings_win.setAttribute(Qt.WA_DeleteOnClose)
+        self._settings_win.show()
+
+    def _update_available(self, version: str, notes: str):
+        self.update_action.setText(f"Update to {version}")
+        self.update_action.setVisible(True)
+        self._last_message = "update"
+        self.tray.showMessage(f"Satsuma {version} is available", "Click to update - it takes a minute.",
+                              self.icon, 15000)
+
+    def _message_clicked(self):
+        if self._last_message == "update":
+            self.install_update()
+
+    def install_update(self):
+        self._last_message = None
+        self.tray.showMessage("Updating Satsuma", "Downloading the new version…", self.icon, 4000)
+        self.updater.install()
+
+    def _update_progress(self, pct: int):
+        self.update_action.setText(f"Downloading update… {pct}%")
+        if pct >= 100:
+            QTimer.singleShot(1500, self.quit)  # the installer takes over and restarts Satsuma
+
+    # -- text drag panel
+    def _text_panel(self):
+        if self.settings.get("text_panel") is False:
+            return None
+        p = TextPanel()
+        p.show_near(QCursor.pos())
+        return p
+
+    def text_action(self, action: str, text: str):
+        import webbrowser
+        from urllib.parse import quote
+        if action == "translate":
+            from PySide6.QtCore import QLocale
+            tl = self.settings.get("translate_to") or QLocale.system().name().split("_")[0]
+            webbrowser.open(f"https://translate.google.com/?sl=auto&tl={tl}&text={quote(text[:4800])}&op=translate")
+        elif action == "qr":
+            from phone import show_qr
+            show_qr(text, "QR code")
+        elif action == "save":
+            from datetime import datetime
+            default = Path.home() / "Desktop" / f"Text {datetime.now():%Y-%m-%d %H%M}.txt"
+            f, _ = QFileDialog.getSaveFileName(None, "Save text", str(default), "Text (*.txt);;Markdown (*.md)")
+            if f:
+                Path(f).write_text(text, encoding="utf-8")
+                self.tray.showMessage("Saved", Path(f).name, self.icon, 3000)
+        elif action == "count":
+            words = len(text.split())
+            lines = text.count("\n") + 1
+            self.tray.showMessage("Text count", f"{words:,} words · {len(text):,} characters · "
+                                  f"{lines:,} lines", self.icon, 6000)
+        elif action == "search":
+            webbrowser.open(f"https://www.google.com/search?q={quote(text[:500])}")
 
     def undo_last(self):
         row = self.jobs.last_undoable()
@@ -844,6 +1015,31 @@ class Controller(QObject):
         m.exec(QCursor.pos())
 
     def run(self, action, files: list[Path], params: dict | None = None):
+        if action.ui == "phone":
+            from phone import PhoneShare
+            try:
+                self._phone = PhoneShare(files)
+                self._phone.setAttribute(Qt.WA_DeleteOnClose)
+                self._phone.show()
+                self._phone.raise_()
+                self._phone.activateWindow()
+            except Exception as e:
+                log(f"send to phone: {e}")
+                self.tray.showMessage("Send to phone", f"Couldn't start sharing ({e}).", self.icon, 5000)
+            return
+        if action.editor and params is None:
+            from editors import EDITORS
+            for f in (files if action.each else [files]):
+                group = [f] if action.each else f
+                try:
+                    p = EDITORS[action.editor](action, group, self.settings)
+                except Exception as e:
+                    log(f"editor {action.editor}: {e}")
+                    self.tray.showMessage("Satsuma", str(e), self.icon, 5000)
+                    continue
+                if p is not None:
+                    self.jobs.add(action, group, p)
+            return
         if action.params and params is None:
             dlg = ParamDialog(action, files, self.settings)
             if not dlg.exec():
@@ -942,7 +1138,10 @@ def main() -> int:
     if files:
         ctrl.queue_open(files)
     log(f"started ({mode})")
-    return app.exec()
+    code = app.exec()
+    ctrl.watcher.stop()
+    sys.stdout and sys.stdout.flush()
+    os._exit(code)  # skip interpreter teardown: Qt objects destroyed in the wrong order can crash on exit
 
 
 if __name__ == "__main__":

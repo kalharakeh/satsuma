@@ -30,12 +30,11 @@ if (Test-Path $vpy) {
 }
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 if ((Resolve-Path $Src).Path -ne (Resolve-Path $Dest).Path) {
-    foreach ($f in @("app.py", "engine.py", "features.py", "presets.py", "dialogs.py", "watch.py",
-                     "hook.py", "integrate.py", "textdrag.py", "inject.py", "version.py", "requirements.txt",
-                     "README.md", "uninstall.bat", "build_exe.bat", "install.bat", "install.ps1")) {
-        Copy-Item -LiteralPath (Join-Path $Src $f) -Destination $Dest -Force
+    Get-ChildItem -LiteralPath $Src -File | Where-Object { $_.Extension -in ".py", ".txt", ".md", ".bat", ".ps1" } |
+        Copy-Item -Destination $Dest -Force
+    foreach ($d in @("assets", "models")) {
+        Copy-Item -LiteralPath (Join-Path $Src $d) -Destination $Dest -Recurse -Force
     }
-    Copy-Item -LiteralPath (Join-Path $Src "assets") -Destination $Dest -Recurse -Force
 }
 Write-Host "Installing to $Dest"
 
@@ -56,7 +55,7 @@ if (-not (Test-Path $vpy)) {
 }
 & $vpy -m pip install --upgrade pip --quiet
 & $vpy -m pip uninstall -y PySide6 PySide6_Addons PySide6_WebEngine PySide6_Pdf 2>$null | Out-Null
-& $vpy -m pip install -r (Join-Path $Dest "requirements.txt")
+& $vpy -m pip install -r (Join-Path $Dest "requirements.txt") -r (Join-Path $Dest "requirements-ai.txt")
 if ($LASTEXITCODE -ne 0) { Write-Host "Package install failed - see the errors above." -ForegroundColor Red; exit 1 }
 
 # 3. FFmpeg: a full build is better than the bundled fallback (more codecs)

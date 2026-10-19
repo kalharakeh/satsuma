@@ -187,6 +187,8 @@ _rapid = None
 
 def _ocr_rapid(png: Path) -> str:
     global _rapid
+    import aipack
+    aipack.ensure(lambda f: None)
     try:
         from rapidocr_onnxruntime import RapidOCR
     except ImportError:
@@ -264,11 +266,13 @@ _session = None
 def _u2net(progress: Progress):
     global _session
     if _session is None:
+        import aipack
+        aipack.ensure(progress, (0.0, 0.3))
         try:
             import onnxruntime as ort
         except ImportError:
             raise ConversionError("Background removal needs onnxruntime: pip install onnxruntime")
-        model = download(U2NET_URL, local_dir("models") / "u2net.onnx", progress, (0.0, 0.6))
+        model = download(U2NET_URL, local_dir("models") / "u2net.onnx", progress, (0.3, 0.6))
         opts = ort.SessionOptions()
         opts.log_severity_level = 3
         _session = ort.InferenceSession(str(model), opts, providers=["CPUExecutionProvider"])
@@ -330,6 +334,8 @@ def _srt_time(t: float) -> str:
 
 
 def transcribe(src: Path, progress: Progress, params: dict | None = None):
+    import aipack
+    aipack.ensure(progress, (0.0, 0.03))
     try:
         from faster_whisper import WhisperModel
     except ImportError:

@@ -1,0 +1,6 @@
+# The "AI pack": background removal, AI upscaling, speech-to-text, fallback OCR.
+# The installer downloads these on first use; from source, install them with:
+#   pip install -r requirements-ai.txt
+onnxruntime>=1.18
+faster-whisper>=1.0
+rapidocr-onnxruntime>=1.3

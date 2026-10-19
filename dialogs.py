@@ -63,6 +63,16 @@ class ParamDialog(QDialog):
                 w = QCheckBox(p.label)
                 w.setChecked(bool(saved.get(p.key, p.default)))
                 form.addRow("", w)
+            elif p.type == "choice":
+                w = QComboBox()
+                w.setEditable(True)
+                w.addItems([str(c) for c in p.choices])
+                w.setCurrentText(str(saved.get(p.key, p.default) or ""))
+                if p.help:
+                    w.setToolTip(p.help)
+                    w.lineEdit().setPlaceholderText(p.help)
+                w.setMinimumWidth(260)
+                form.addRow(p.label, w)
             else:
                 w = QLineEdit()
                 if p.type == "password":
@@ -78,7 +88,7 @@ class ParamDialog(QDialog):
         self.preview = QLabel("", objectName="preview")
         self.preview.setWordWrap(True)
         v.addWidget(self.preview)
-        if action.id in ("vid-trim", "aud-trim"):
+        if action.id in ("vid-trim", "aud-trim", "vid-gifclip"):
             self._show_length()
         if action.id == "rename":
             for w in self.fields.values():
@@ -91,10 +101,10 @@ class ParamDialog(QDialog):
         bb.accepted.connect(self._accept)
         bb.rejected.connect(self.reject)
         v.addWidget(bb)
-        first = next((w for w in self.fields.values() if isinstance(w, QLineEdit)), None)
+        first = next((w for w in self.fields.values() if isinstance(w, (QLineEdit, QComboBox))), None)
         if first:
             first.setFocus()
-            first.selectAll()
+            (first.lineEdit() if isinstance(first, QComboBox) else first).selectAll()
 
     def _show_length(self):
         try:
@@ -121,7 +131,7 @@ class ParamDialog(QDialog):
     def values(self) -> dict:
         out = {}
         for k, w in self.fields.items():
-            out[k] = w.isChecked() if isinstance(w, QCheckBox) else w.text()
+            out[k] = w.isChecked() if isinstance(w, QCheckBox) else w.currentText() if isinstance(w, QComboBox) else w.text()
         return out
 
     def _accept(self):
@@ -153,6 +163,7 @@ class WatchDialog(QDialog):
         self.folder = QLineEdit()
         self.folder.setPlaceholderText("Folder")
         browse = QPushButton("Browse…")
+        browse.setAutoDefault(False)
         browse.clicked.connect(self._browse)
         row.addWidget(self.folder, 1)
         row.addWidget(browse)
@@ -167,8 +178,10 @@ class WatchDialog(QDialog):
             prefix = kind_names.get(k, "Any file")
             self.action.addItem(f"{prefix}: {a.label}", a.id)
         add = QPushButton("Add")
+        add.setAutoDefault(False)
         add.clicked.connect(self._add)
         remove = QPushButton("Remove selected")
+        remove.setAutoDefault(False)
         remove.clicked.connect(self._remove)
         row2.addWidget(self.action, 1)
         row2.addWidget(add)
@@ -177,6 +190,7 @@ class WatchDialog(QDialog):
         bb.addWidget(remove)
         bb.addStretch(1)
         done = QPushButton("Done")
+        done.setAutoDefault(False)
         done.setDefault(True)
         done.clicked.connect(self.accept)
         bb.addWidget(done)

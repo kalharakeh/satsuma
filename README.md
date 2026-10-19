@@ -16,62 +16,93 @@
 
 ---
 
-**Satsuma** is a file converter that lives where your files already are. Hold **Shift** while dragging any file in Explorer or on the desktop: a panel of formats appears under your cursor. Drop the file on one and the converted copy is saved **next to the original**.
+**Satsuma** is a file converter that lives where your files already are. Hold **Shift** while dragging any file in Explorer or on the desktop, and a panel of formats appears under your cursor. Drop the file on one and the converted copy is saved **next to the original**.
 
 It works for **text** too: select some text in any app, Shift-drag it, and a copy lands wherever you let go.
 
-You don't open an app, upload anything or wait in a queue. Every conversion runs on your own PC, and your original file is never changed.
+You don't open an app, upload anything or wait in a queue. Everything runs on your own PC, and your original file is never changed.
 
 > Inspired by Tangerine for Mac. Satsuma is an independent, open-source take on the idea for Windows.
 
-## What it does
-
 <table>
 <tr>
-<td width="50%"><img src="docs/panel-image.png" alt="Panel for a photo"></td>
-<td width="50%"><img src="docs/panel-video.png" alt="Panel for a video"></td>
+<td width="33%"><img src="docs/panel-image.png" alt="Panel for a photo"></td>
+<td width="33%"><img src="docs/panel-video.png" alt="Panel for a video"></td>
+<td width="33%"><img src="docs/panel-pdf.png" alt="Panel for a PDF"></td>
 </tr>
 </table>
 
+## What it does
+
 | | Convert to | Tools |
 |---|---|---|
-| **Images** (JPG, PNG, HEIC, WEBP, AVIF, GIF, TIFF, BMP, ICO) | any of them, PDF, GIF→MP4 | compress · **remove background** · **extract text (OCR)** · resize · strip EXIF/GPS · rotate · black & white · combine into one PDF |
-| **Video** (MP4, MOV, MKV, AVI, WEBM, …) | MP4 (H.264), HEVC, MOV, MKV, WEBM, GIF, MP3/WAV/M4A | compress · **trim** · **subtitles from speech** · 1080p/720p · mute · rotate · thumbnail · strip metadata |
-| **Audio** (MP3, WAV, FLAC, M4A, OGG, OPUS, …) | MP3, WAV, FLAC, M4A, OGG, OPUS, AIFF | **trim** · **transcribe** · normalize loudness · compress · strip tags |
-| **PDF** | PNG, JPG, Word (DOCX), TXT | compress · merge · split · **OCR scanned pages** · **add/remove password** · rotate · strip metadata |
+| **Images** (JPG, PNG, HEIC, WEBP, AVIF, GIF, TIFF, BMP, ICO) | any of them, PDF, GIF→MP4 | **fit under X MB** · compress · **remove background** · **AI upscale 2×/4×** · **blur faces & areas** · extract text (OCR) · resize · strip EXIF/GPS · rotate · black & white · combine into one PDF |
+| **Video** (MP4, MOV, MKV, AVI, WEBM, …) | MP4, HEVC, MOV, MKV, WEBM, GIF, MP3/WAV/M4A | **fit under X MB** · compress · trim · **join clips** · **speed up / slow down** · **GIF from a range** · subtitles from speech · **burn in captions** · **remove noise** · **save frames** · 1080p/720p · mute · rotate · thumbnail |
+| **Audio** (MP3, WAV, FLAC, M4A, OGG, OPUS, …) | MP3, WAV, FLAC, M4A, OGG, OPUS, AIFF | **fit under X MB** · trim · transcribe · **remove noise** · **change speed** · normalize · compress |
+| **PDF** | PNG, JPG, Word, **Excel (tables)**, TXT | **fit under X MB** · compress · merge · split · **reorder / delete / rotate pages** · **sign** · **watermark** · OCR scans · add/remove password |
 | **Office** (DOCX, PPTX, XLSX, ODT, RTF) | PDF *(needs Office or LibreOffice)*, CSV | |
 | **Data** | CSV ↔ XLSX / JSON | |
-| **Anything** | ZIP, 7Z | extract (ZIP, 7Z, RAR, TAR, GZ) · **batch rename** |
+| **Photos & folders** | ZIP, 7Z | **sort into folders by date taken** · **find duplicates** · batch rename · extract archives |
+| **Anything** | | **send to your phone** (QR code over Wi-Fi) |
+
+## Highlights
 
 ### Shift-drag text
 
 <img src="docs/text-drag.png" alt="Shift-dragging selected text from an email into a notes window" width="100%">
 
-Select text in any app, hold **Shift** and drag it, then let go somewhere else: in another window, another app, or later in the same document. A copy is typed in where you released. The original text isn't touched, and your clipboard is put back afterwards. Right-click while dragging to cancel.
+Select text in any app, hold **Shift** and drag. Let go anywhere to paste a copy there. You can also drop it on the small panel that appears:
 
-A plain Shift-click still works as usual, and if nothing is selected, a Shift-drag behaves normally. You can switch this off in the tray menu (*Shift-drag selected text*).
+<img src="docs/text-panel.png" alt="Text tools panel" width="360" align="right">
 
-### The extras
+- **UPPER / lower / Title:** changes the selected text in place
+- **Clean:** fixes text copied from PDFs by joining broken lines, removing double spaces and re-joining hyphenated words
+- **Translate:** opens it in your browser's translator
+- **QR:** turns the text (a link, Wi-Fi details, a note) into a QR code
+- **Save** as a .txt file, or **Count** words and characters
 
-- **🪄 Remove background:** cuts the subject out of a photo and saves a transparent PNG. It uses a local U²-Net model.
-- **💬 Subtitles from speech:** drop a video and get an `.srt` file plus a plain transcript. It uses Whisper, works in ~100 languages, and runs on your CPU.
-- **🔎 Text from images and scans:** uses Windows' built-in OCR (the languages you have installed), with an offline fallback.
-- **✂️ Trim:** cut a clip from a video or audio file by start and end time. The fast cut doesn't re-encode, or you can choose a frame-exact cut.
-- **🔒 PDF passwords:** add AES-256 protection or remove it.
-- **🏷️ Batch rename:** use patterns like `Lisbon {n}`, `{taken} {name}` or `{date}`, with a live preview before anything changes.
-- **⭐ Presets:** your own one-click tiles, e.g. *"WEBP, max 1600 px, 80%"* or *"720p for WhatsApp"*.
-- **📂 Watch folders:** every new file in a folder gets converted automatically, e.g. screenshots become WEBP.
-- **↩️ Undo:** sends the last result to the Recycle Bin, or puts renamed files back.
+Your clipboard is put back afterwards, and a plain Shift-click still works as usual.
+<br clear="right">
 
-The AI features download their model once on first use (cut-out ~170 MB, speech ~460 MB). After that they work without internet.
+### Fit under X MB
+
+<img src="docs/dialog-fit.png" alt="Fit under a size dialog" width="380" align="right">
+
+Email limit 10 MB? Discord 25 MB? A form that wants "max 2 MB"? Drop any **image, video, audio file or PDF** on *Fit MB* and pick the size. Satsuma finds the best quality that fits: two-pass encoding for video, and quality plus resolution search for images and PDFs.
+<br clear="right">
+
+### Send to phone
+
+<img src="docs/phone.png" alt="Send to phone with a QR code" width="260" align="right">
+
+Drop anything on *Phone* and scan the QR code. The file downloads straight from your PC over your own Wi-Fi, with no cloud, account or cable. Folders and multiple files arrive as one zip, and sharing stops when you close the window.
+<br clear="right">
+
+### Privacy blur, PDF pages, signing
 
 <table>
 <tr>
-<td width="33%"><img src="docs/dialog-trim.png" alt="Trim dialog"></td>
-<td width="33%"><img src="docs/dialog-rename.png" alt="Batch rename with preview"></td>
-<td width="33%"><img src="docs/jobs.png" alt="Progress cards"></td>
+<td width="40%"><img src="docs/editor-blur.png" alt="Blur editor"></td>
+<td width="33%"><img src="docs/editor-pages.png" alt="PDF page editor"></td>
+<td width="27%"><img src="docs/editor-sign.png" alt="Sign a PDF"></td>
 </tr>
 </table>
+
+- **Blur:** faces are found automatically. Drag boxes over number plates, names or screens, and choose blur, pixelate or a black box. EXIF/GPS data is removed too.
+- **Pages:** reorder pages by dragging, rotate them, or delete them.
+- **Sign:** draw your signature once (or use a photo of it). Click where it goes, and Satsuma removes the paper background for you.
+
+### Local AI
+
+- **Remove background** (U²-Net), **upscale 2×/4×** (Real-ESRGAN), and **subtitles / transcripts** from speech (Whisper, ~100 languages). Everything runs on your CPU, and your files never leave the PC.
+- The installer stays small. The AI libraries (~80 MB) download the first time you use an AI tool, or ahead of time from *Settings → AI tools*.
+
+### Make it yours
+
+- **Presets:** your own one-click tiles, like *"WEBP, max 1600 px, 80%"* or *"720p for WhatsApp"*. Create them in *Settings → Presets*.
+- **Watch folders:** every new file in a folder is converted automatically, e.g. screenshots become WEBP.
+- **Undo:** sends the last result to the Recycle Bin, or puts moved and renamed files back.
+- **Updates:** Satsuma checks GitHub once a day, and a click updates it.
 
 ## Install
 
@@ -85,11 +116,11 @@ Prefer no installer? Download `Satsuma-portable.zip` from [Releases](https://git
 <details>
 <summary><b>Run from source</b> (Python 3.10–3.13)</summary>
 
-Double-click `install.bat`. It installs Python and FFmpeg with winget if they're missing, creates a private virtual environment in `%LOCALAPPDATA%\Programs\Satsuma`, and registers everything. Or do it manually:
+Double-click `install.bat`. It installs Python and FFmpeg with winget if they're missing, sets up a private environment in `%LOCALAPPDATA%\Programs\Satsuma`, and registers everything. Or do it manually:
 
 ```powershell
 py -3.12 -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pip install -r requirements.txt -r requirements-ai.txt
 .venv\Scripts\pythonw app.py --install
 ```
 </details>
@@ -99,73 +130,55 @@ py -3.12 -m venv .venv
 | How | What happens |
 |---|---|
 | **Shift + drag** one or more files | The panel appears at the cursor. Drop on a tile, or on **•••** for every option. |
-| **Shift + drag** selected text | A copy is pasted where you release the mouse. |
+| **Shift + drag** selected text | Let go anywhere to paste a copy, or drop on a text tool. |
 | **Right-click → Convert with Satsuma** | Same panel, click a tile. *(On Windows 11 it's under "Show more options".)* |
 | **Send To → Satsuma** | Works with many selected files at once. |
-| **Tray icon** | Convert files, Undo, Edit presets, Watch folders, settings. |
+| **Tray icon** | Convert files, Undo, Settings, updates. |
 
-Output names never overwrite anything: `photo.jpg`, `photo-compressed.jpg`, `photo (1).jpg`.
-
-<details>
-<summary><b>Presets</b>: make your own tiles</summary>
-
-Tray → **Edit presets…** opens `%APPDATA%\Satsuma\presets.json`. Save the file and the tiles update immediately.
-
-```json
-{
-  "presets": [
-    { "name": "Web image", "tile": "Web", "hint": "1600 webp", "for": "image",
-      "format": "webp", "quality": 80, "max_px": 1600, "strip": true, "tag": "web" },
-    { "name": "WhatsApp video", "tile": "Share", "hint": "720p", "for": "video", "ext": ".mp4",
-      "ffmpeg": ["-c:v", "libx264", "-crf", "28", "-vf", "scale=-2:720", "-c:a", "aac", "-b:a", "96k"] }
-  ]
-}
-```
-
-- **Images:** `format` (jpg, png, webp, avif, heic), `quality`, `max_px`, `strip`.
-- **Video and audio:** `ext` plus any FFmpeg output arguments in `ffmpeg`.
-</details>
-
-<details>
-<summary><b>Watch folders</b></summary>
-
-Tray → **Watch folders…** lets you pick a folder and an action. New files get converted once they've finished copying. Files already in the folder, and Satsuma's own results, are left alone.
-
-<img src="docs/dialog-watch.png" alt="Watch folders dialog" width="480">
-</details>
+Output names never overwrite anything: `photo.jpg`, `photo-10MB.jpg`, `photo (1).jpg`.
 
 ## Privacy
 
-Satsuma has no account, no telemetry and no cloud. Files are processed by FFmpeg, Pillow, PyMuPDF, ONNX Runtime and Whisper on your own machine. The only network requests are the one-time model downloads for background removal (from GitHub) and speech-to-text (from Hugging Face), and only when you first use those tools.
+Satsuma has no account, no telemetry and no cloud. Files are processed on your own machine. The only network requests are:
+
+- the daily update check (GitHub)
+- one-time downloads of the AI pack and models (GitHub, Hugging Face), only when you first use an AI tool
+- *Translate*, which opens your browser's translator with the text you chose
 
 ## FAQ
 
-**Does Shift-drag move my file?** No. In Explorer Shift-drag normally means *move*, but Satsuma always accepts the drop as a *copy*, so the original stays where it was.
+**Does Shift-drag move my file?** No. In Explorer, Shift-drag normally means *move*, but Satsuma always accepts the drop as a *copy*.
 
-**The panel doesn't appear when I drag from some app.** By default Satsuma only reacts to drags that start in Explorer, on the desktop or in Open/Save dialogs, so Shift-selecting text elsewhere doesn't pop it up. You can turn that off in the tray menu. Windows also blocks drag-and-drop from apps running as administrator into normal apps; use the right-click entry there.
+**The panel doesn't appear when I drag from some app.** By default, file drags only count from Explorer, the desktop and Open/Save dialogs. You can change this in *Settings*. Windows also blocks drag-and-drop and text-drag for apps running as administrator.
 
-**Text drag doesn't work in one app.** Windows doesn't let normal apps send input to apps running as administrator, so Satsuma leaves those windows alone. Terminals, the taskbar and the Start menu are skipped on purpose.
+**Send to phone doesn't load.** Both devices need to be on the same network. The first time, Windows asks whether to allow Satsuma on private networks; say yes.
 
 **Where are the logs?** In `%APPDATA%\Satsuma\satsuma.log` (tray → *Open log*).
 
-**How do I uninstall?** Use *Settings → Apps → Satsuma → Uninstall*. Models live in `%LOCALAPPDATA%\Satsuma`. Delete that folder too if you want the disk space back.
+**How do I uninstall?** Use *Settings → Apps → Satsuma → Uninstall*. The AI pack and models live in `%LOCALAPPDATA%\Satsuma`; delete that folder too to free the space.
 
 ## Roadmap
 
 - [ ] Entry in the Windows 11 top-level right-click menu (needs a signed shell extension)
 - [ ] Code-signed installer
-- [ ] Image upscaling (local model)
+- [ ] Offline translation
 - [ ] Audio stem separation (vocals / music)
-- [ ] Translations of the UI
+- [ ] UI translations
 
 Ideas and bug reports are welcome in **[Issues](https://github.com/kalharakeh/satsuma/issues)**.
 
 ## How it's built
 
-`app.py` is the tray app, drop panel and progress cards (PySide6). `hook.py` handles Shift-drag detection (a low-level mouse hook). Each conversion runs in its own child process (`engine.py`, `features.py`, `presets.py`), so a crash or a huge video never freezes the UI. `tests/smoke_test.py` runs real conversions, and CI runs it on Windows against both the source and the built `.exe` before every release.
+`app.py` is the tray app, drop panel, text panel and progress cards (PySide6). `hook.py` and `textdrag.py` handle Shift-drag detection with a low-level mouse hook. Each conversion runs in its own child process (`engine.py`, `features.py`, `tools2.py`), so a crash or a huge video never freezes the UI. `tests/` runs ~50 real conversions plus the text-drag logic, and CI runs them on Windows against both the source and the built `.exe` before every release.
 
 ## License
 
-[AGPL-3.0](LICENSE), because Satsuma builds on [PyMuPDF](https://github.com/pymupdf/PyMuPDF) (AGPL). The installer bundles [FFmpeg](https://ffmpeg.org) (GPL) as a separate program. Its license and source link are in the `bin` folder.
+[AGPL-3.0](LICENSE), because Satsuma builds on [PyMuPDF](https://github.com/pymupdf/PyMuPDF) (AGPL). Bundled and downloaded components keep their own licenses:
+
+- [FFmpeg](https://ffmpeg.org) (GPL), shipped as a separate program in `bin`
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (BSD-3)
+- [YuNet](https://github.com/opencv/opencv_zoo) (MIT)
+- [U²-Net](https://github.com/xuebinqin/U-2-Net) (Apache-2.0)
+- [Whisper](https://github.com/openai/whisper) (MIT)
 
 Made in Stockholm by [Kassem Alharakeh](https://github.com/kalharakeh).

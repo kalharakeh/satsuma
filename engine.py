@@ -150,6 +150,8 @@ class Action:
     skip_ext: frozenset = frozenset()   # don't offer converting X -> X
     only_ext: frozenset = frozenset()   # only offer for these extensions
     params: tuple = ()      # Param specs the UI asks for before running
+    editor: str = ""        # name of a custom dialog that produces the params (dialogs.EDITORS)
+    ui: str = ""            # handled entirely by the app, no conversion job (e.g. "phone")
     prio: int = 50          # lower = earlier in the panel
 
     def applies(self, files: list[Path]) -> bool:
@@ -178,9 +180,10 @@ def register(a: Action) -> Action:
 class Param:
     key: str
     label: str
-    type: str = "text"      # text | password | bool | time
+    type: str = "text"      # text | password | bool | time | choice
     default: object = ""
     help: str = ""
+    choices: tuple = ()     # for "choice": suggestions; the box stays editable
 
 
 def applicable(files: list[Path]) -> list[Action]:
@@ -221,25 +224,30 @@ def run_ffmpeg(src: Path, dest: Path, args: list[str], progress: Progress,
     exe = ffmpeg_exe()
     dur = duration if duration is not None else media_duration(exe, src)
     with staged(dest) as tmp:
-        cmd = [exe, "-hide_banner", "-nostdin", "-y", *(pre or []), "-i", str(src), *args,
-               "-progress", "pipe:1", "-nostats", str(tmp)]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                encoding="utf-8", errors="replace", creationflags=NOWIN)
-        tail: deque[str] = deque(maxlen=25)
-        t = threading.Thread(target=lambda: tail.extend(proc.stderr), daemon=True)
-        t.start()
-        for line in proc.stdout:
-            if dur and line.startswith(("out_time_us=", "out_time_ms=")):
-                try:
-                    progress(min(int(line.split("=", 1)[1]) / 1e6 / dur, 0.99))
-                except ValueError:
-                    pass
-        rc = proc.wait()
-        t.join(2)
-        if rc != 0:
-            msg = next((l.strip() for l in reversed(tail) if l.strip() and not l.startswith(" ")), "FFmpeg failed")
-            raise ConversionError(f"FFmpeg: {msg}")
+        ffmpeg_exec([*(pre or []), "-i", str(src), *args, str(tmp)], dur, progress)
     return dest
+
+
+def ffmpeg_exec(args: list[str], duration: float, progress: Progress, cwd: str | None = None):
+    """Run ffmpeg with the given arguments (inputs, filters, output), reporting progress."""
+    exe = ffmpeg_exe()
+    cmd = [exe, "-hide_banner", "-nostdin", "-y", "-progress", "pipe:1", "-nostats", *args]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd,
+                            encoding="utf-8", errors="replace", creationflags=NOWIN)
+    tail: deque[str] = deque(maxlen=25)
+    t = threading.Thread(target=lambda: tail.extend(proc.stderr), daemon=True)
+    t.start()
+    for line in proc.stdout:
+        if duration and line.startswith(("out_time_us=", "out_time_ms=")):
+            try:
+                progress(min(max(int(line.split("=", 1)[1]), 0) / 1e6 / duration, 0.99))
+            except ValueError:
+                pass
+    rc = proc.wait()
+    t.join(2)
+    if rc != 0:
+        msg = next((l.strip() for l in reversed(tail) if l.strip() and not l.startswith(" ")), "FFmpeg failed")
+        raise ConversionError(f"FFmpeg: {msg}")
 
 
 def ffmpeg_action(id, label, tile, group, kinds, ext, args, tag="", hint="", skip=(), only=(), smaller=False):
@@ -1118,7 +1126,7 @@ def run_cli(action_id: str, args: list[str]) -> int:
         return 2
     try:
         target = files[0] if act.each else files
-        res = act.fn(target, progress, params) if act.params else act.fn(target, progress)
+        res = act.fn(target, progress, params) if (act.params or act.editor) else act.fn(target, progress)
         undo = None
         if isinstance(res, tuple):  # (outputs, undo-record)
             res, undo = res
@@ -1138,6 +1146,7 @@ def run_cli(action_id: str, args: list[str]) -> int:
 
 # extra features live in their own modules; importing them registers their actions
 import features  # noqa: E402,F401
+import tools2  # noqa: E402,F401
 
 if __name__ == "__main__":
     import engine as _engine  # use the module that features/presets registered into

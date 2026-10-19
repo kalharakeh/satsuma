@@ -15,6 +15,8 @@ decides (fast, no I/O); `TextDrag` runs on the Qt thread and does the work.
 """
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import QMimeData, QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QCursor, QFontMetrics, QGuiApplication
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
@@ -125,9 +127,11 @@ class TextDrag(QObject):
 
     COPY_WAIT_MS = 160
 
-    def __init__(self, flt: TextDragFilter, log=lambda m: None):
+    def __init__(self, flt: TextDragFilter, log=lambda m: None, panel_factory=None, on_action=None):
         super().__init__()
         self.flt, self.log = flt, log
+        self.panel_factory, self.on_action = panel_factory, on_action
+        self.panel = None
         self.chip = Chip()
         self.saved = None
         self.text: str | None = None
@@ -194,6 +198,11 @@ class TextDrag(QObject):
                 self._paste_at(*self.pending_drop)
             else:
                 self.chip.start(text)
+                if self.panel_factory:
+                    try:
+                        self.panel = self.panel_factory()
+                    except Exception as e:
+                        self.log(f"text panel: {e}")
             return
         # nothing selected: behave like an ordinary Shift-drag from the original point
         if inject.clipboard_seq() != seq:
@@ -214,10 +223,40 @@ class TextDrag(QObject):
         if self.deciding:
             self.pending_drop = (x, y)
         elif self.text is not None:
-            self._paste_at(x, y)
+            key = self.panel.hit(QCursor.pos()) if self.panel is not None else None
+            if key:
+                self._tool(key)
+            else:
+                self._paste_at(x, y)
+
+    def _close_panel(self):
+        if self.panel is not None:
+            try:
+                self.panel.close()
+            except RuntimeError:
+                pass
+            self.panel = None
+
+    def _tool(self, key: str):
+        text, self.text = self.text, None
+        self.chip.stop()
+        self._close_panel()
+        if key in TRANSFORMS:
+            # the selection is still there in the source app (we never clicked): paste over it
+            new = TRANSFORMS[key](text)
+            QGuiApplication.clipboard().setText(new)
+            inject.release_shift()
+            QTimer.singleShot(60, inject.paste)
+            QTimer.singleShot(700, self._restore)
+            self.log(f"text drag: {key} on {len(text)} chars")
+            return
+        self._restore()
+        if self.on_action:
+            QTimer.singleShot(0, lambda: self.on_action(key, text))
 
     def _paste_at(self, x: int, y: int):
         self.chip.stop()
+        self._close_panel()
         inject.release_shift()
         inject.left_down(x, y)  # put the caret at the drop point
         inject.left_up(x, y)
@@ -238,7 +277,31 @@ class TextDrag(QObject):
     def _cancel(self):
         self.aborted = True
         self.chip.stop()
+        self._close_panel()
         self.text = None
         self.pending_drop = None
         if self.saved is not None:
             self._restore()
+
+
+# ------------------------------------------------------------------ transforms
+
+def _title(t: str) -> str:
+    return re.sub(r"(?<![\w'\u2019])(\w)([\w'\u2019]*)", lambda m: m.group(1).upper() + m.group(2).lower(), t)
+
+
+def _clean(t: str) -> str:
+    """Join lines broken mid-sentence (PDF copies), squeeze spaces, keep paragraphs."""
+    t = t.replace("\r\n", "\n").replace("\u00a0", " ").replace("\u00ad", "")
+    paras = re.split(r"\n\s*\n", t.strip())
+    out = []
+    for p in paras:
+        p = re.sub(r"(\w)-\n(\w)", r"\1\2", p)        # re-join hyphenated words
+        p = re.sub(r"\s*\n\s*", " ", p)
+        p = re.sub(r"[ \t]{2,}", " ", p)
+        p = re.sub(r" ([,.;:!?])", r"\1", p)
+        out.append(p.strip())
+    return "\n\n".join(out)
+
+
+TRANSFORMS = {"upper": str.upper, "lower": str.lower, "title": _title, "clean": _clean}

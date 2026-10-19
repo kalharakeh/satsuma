@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          pip install -r requirements.txt -r requirements-ai.txt pyinstaller
 
       - name: Smoke test (from source, on Windows)
         run: python tests/smoke_test.py --ai
@@ -68,8 +68,27 @@ jobs:
           Copy-Item build_bin\* dist\Satsuma\bin\
           Copy-Item LICENSE, README.md dist\Satsuma\
 
-      - name: Smoke test (the built .exe)
-        run: python tests/smoke_test.py --exe dist/Satsuma/Satsuma.exe
+      - name: Build the AI pack
+        shell: pwsh
+        run: |
+          python -m pip install --target build_ai --no-compile -r requirements-ai.txt
+          # the app already bundles these; the pack must use the app's copies
+          Get-ChildItem build_ai -Directory | Where-Object { $_.Name -match '^(numpy|cv2|opencv|PIL|pillow|bin)' } |
+            Remove-Item -Recurse -Force
+          Get-ChildItem build_ai -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+          # Visual C++ runtime for onnxruntime/ctranslate2 on PCs that don't have it
+          foreach ($dll in "msvcp140.dll","msvcp140_1.dll","msvcp140_2.dll","vcruntime140.dll","vcruntime140_1.dll","concrt140.dll") {
+            $p = Join-Path $env:WINDIR "System32\$dll"
+            if (Test-Path $p) { Copy-Item $p build_ai\ }
+          }
+          Compress-Archive -Path build_ai\* -DestinationPath dist\Satsuma-AI-pack.zip
+          "READY" | Set-Content build_ai\READY
+          "{0:N0} MB AI pack" -f ((Get-Item dist\Satsuma-AI-pack.zip).Length / 1MB)
+
+      - name: Smoke test (the built .exe, with the AI pack)
+        env:
+          SATSUMA_AIPACK_DIR: ${{ github.workspace }}\build_ai
+        run: python tests/smoke_test.py --exe dist/Satsuma/Satsuma.exe --ai
 
       - name: Build installer
         shell: pwsh
@@ -84,6 +103,7 @@ jobs:
           path: |
             dist/Satsuma-Setup.exe
             dist/Satsuma-portable.zip
+            dist/Satsuma-AI-pack.zip
 
       - name: Publish release
         if: github.event_name == 'release'
@@ -94,3 +114,4 @@ jobs:
           files: |
             dist/Satsuma-Setup.exe
             dist/Satsuma-portable.zip
+            dist/Satsuma-AI-pack.zip

@@ -58,4 +58,27 @@ print("5 cancel:", calls, cb.text(), t.chip.isVisible()); assert "paste" not in 
 # 6. no shift / not eligible -> never intercept
 f,t=mk(); assert f.handle(D,1,1,False)=="pass" and f.handle(U,1,1,False)=="pass"
 f,t=mk(eligible=False); assert f.handle(D,1,1,True)=="pass"
+# 7. text panel: drop on a tool -> transform pasted over the selection, clipboard restored after
+class FakePanel:
+    def __init__(self, key): self.key=key; self.closed=False
+    def hit(self, pos): return self.key
+    def close(self): self.closed=True
+selection["text"]="make me loud"; cb.setText("BEFORE"); calls.clear()
+panel=FakePanel("upper")
+f=td.TextDragFilter(lambda x,y: True); t=td.TextDrag(f, panel_factory=lambda: panel)
+f.handle(D,10,10,True); f.handle(M,60,60,True); wait(300)
+assert t.panel is panel
+seen=[]
+orig_paste=inject.paste
+inject.paste=lambda: (calls.append(("paste",)), seen.append(cb.text()))
+f.handle(U,70,70,True); wait(1000)
+print("7 panel upper:", calls, seen, cb.text(), panel.closed)
+assert seen==["MAKE ME LOUD"] and cb.text()=="BEFORE" and panel.closed and ("left_down",70,70) not in calls
+
+# 8. text panel: non-transform tool goes to the app callback with the original text
+got=[]; selection["text"]="scan me"; calls.clear()
+f=td.TextDragFilter(lambda x,y: True); t=td.TextDrag(f, panel_factory=lambda: FakePanel("qr"), on_action=lambda k,txt: got.append((k,txt)))
+f.handle(D,10,10,True); f.handle(M,60,60,True); wait(300); f.handle(U,70,70,True); wait(300)
+print("8 panel qr:", got); assert got==[("qr","scan me")]
+assert td.TRANSFORMS["title"]("it's a TEST") == "It's A Test"
 print("ALL OK")
